@@ -67,6 +67,10 @@
                     <span id="notification-status" class="font-semibold text-gray-500 dark:text-gray-400">OFF</span>
                 </div>
             </div>
+            <!-- ステータス表示エリア (新規追加) -->
+            <div id="notification-debug-status" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-center text-gray-500 dark:text-gray-400 h-5">
+                <!-- ステータスメッセージがここに表示されます -->
+            </div>
         </div>
 
         <!-- リマインド項目リスト -->
@@ -102,7 +106,7 @@
         </div>
     </div>
     
-    <!-- 確認/情報モーダル (新規追加) -->
+    <!-- 確認/情報モーダル -->
     <div id="info-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
             <h3 id="info-modal-title" class="text-lg font-semibold mb-4">確認</h3>
@@ -128,14 +132,14 @@ const modalForm = document.getElementById('modal-form');
 const modalTextarea = document.getElementById('modal-textarea');
 const modalCancel = document.getElementById('modal-cancel');
 const modalSave = document.getElementById('modal-save');
-
-// --- 確認モーダルの要素取得 (新規) ---
 const infoModal = document.getElementById('info-modal');
 const infoModalTitle = document.getElementById('info-modal-title');
 const infoModalBody = document.getElementById('info-modal-body');
 const infoModalButtons = document.getElementById('info-modal-buttons');
 const infoModalCancel = document.getElementById('info-modal-cancel');
 const infoModalOk = document.getElementById('info-modal-ok');
+// ステータス表示用の要素 (新規)
+const notificationDebugStatus = document.getElementById('notification-debug-status');
 
 // --- アプリケーションの状態管理 ---
 let reminders = [];
@@ -155,13 +159,10 @@ function saveData() {
 
 function loadData() {
     const savedReminders = localStorage.getItem('medicalReminders');
-    if (savedReminders) {
-        reminders = JSON.parse(savedReminders);
-    }
+    if (savedReminders) reminders = JSON.parse(savedReminders);
     const savedSettings = localStorage.getItem('medicalReminderSettings');
-    if (savedSettings) {
-        settings = JSON.parse(savedSettings);
-    }
+    if (savedSettings) settings = JSON.parse(savedSettings);
+    
     intervalInput.value = settings.interval;
     notificationToggle.checked = settings.notificationsEnabled;
     updateNotificationStatusUI();
@@ -170,29 +171,19 @@ function loadData() {
 // --- UIの描画 ---
 function renderReminders() {
     reminderList.innerHTML = '';
-    if (reminders.length === 0) {
-        emptyState.classList.remove('hidden');
-        reminderList.classList.add('hidden');
-    } else {
-        emptyState.classList.add('hidden');
-        reminderList.classList.remove('hidden');
-        reminders.forEach(reminder => {
-            const card = document.createElement('div');
-            card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex justify-between items-start gap-4';
-            card.innerHTML = `
-                <p class="flex-1 whitespace-pre-wrap break-words">${escapeHTML(reminder.text)}</p>
-                <div class="flex-shrink-0 flex gap-2">
-                    <button data-id="${reminder.id}" class="edit-btn p-2 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z"/></svg>
-                    </button>
-                    <button data-id="${reminder.id}" class="delete-btn p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    </button>
-                </div>
-            `;
-            reminderList.appendChild(card);
-        });
-    }
+    emptyState.classList.toggle('hidden', reminders.length > 0);
+    reminderList.classList.toggle('hidden', reminders.length === 0);
+    reminders.forEach(reminder => {
+        const card = document.createElement('div');
+        card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex justify-between items-start gap-4';
+        card.innerHTML = `
+            <p class="flex-1 whitespace-pre-wrap break-words">${escapeHTML(reminder.text)}</p>
+            <div class="flex-shrink-0 flex gap-2">
+                <button data-id="${reminder.id}" class="edit-btn p-2 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z"/></svg></button>
+                <button data-id="${reminder.id}" class="delete-btn p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+            </div>`;
+        reminderList.appendChild(card);
+    });
 }
 
 function escapeHTML(str) {
@@ -215,23 +206,14 @@ function showModal(isEditing = false, reminderId = null) {
     modalTextarea.focus();
 }
 
-function hideModal() {
-    modal.classList.add('hidden');
-}
-
-// --- 確認/情報モーダル制御 (新規) ---
-function hideInfoModal() {
-    infoModal.classList.add('hidden');
-    infoModalCallback = null;
-}
+function hideModal() { modal.classList.add('hidden'); }
+function hideInfoModal() { infoModal.classList.add('hidden'); infoModalCallback = null; }
 
 function showConfirmation(title, body, onOk) {
     infoModalTitle.textContent = title;
     infoModalBody.textContent = body;
     infoModalOk.className = 'px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700';
     infoModalCancel.classList.remove('hidden');
-    infoModalOk.classList.remove('hidden');
-    infoModalButtons.classList.remove('justify-center');
     infoModalButtons.classList.add('justify-end');
     infoModalCallback = onOk;
     infoModal.classList.remove('hidden');
@@ -242,7 +224,6 @@ function showMessage(title, body) {
     infoModalBody.textContent = body;
     infoModalOk.className = 'px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700';
     infoModalCancel.classList.add('hidden');
-    infoModalOk.classList.remove('hidden');
     infoModalButtons.classList.remove('justify-end');
     infoModalButtons.classList.add('justify-center');
     infoModalCallback = null;
@@ -254,36 +235,50 @@ function requestNotificationPermission() {
     return new Promise((resolve, reject) => {
         if (!('Notification' in window)) {
             showMessage('エラー', 'このブラウザはデスクトップ通知をサポートしていません。');
-            reject('Not supported');
-            return;
+            reject('Not supported'); return;
         }
-        if (Notification.permission === 'granted') {
-            resolve('Granted');
-            return;
-        }
+        if (Notification.permission === 'granted') { resolve('Granted'); return; }
         if (Notification.permission !== 'denied') {
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') resolve('Granted');
-                else reject('Denied');
-            });
-        } else {
-            reject('Denied');
-        }
+            Notification.requestPermission().then(p => p === 'granted' ? resolve('Granted') : reject('Denied'));
+        } else { reject('Denied'); }
     });
 }
 
-function showNotification() {
-    if (reminders.length === 0) return;
-    const randomReminder = reminders[Math.floor(Math.random() * reminders.length)];
-    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(reg => reg.showNotification('メディカル・リマインダー', {
-            body: randomReminder.text,
-            icon: 'icons/icon-192x192.png',
-            badge: 'icons/icon-72x72.png'
-        }));
-    } else {
-        new Notification('メディカル・リマインダー', { body: randomReminder.text, icon: 'icons/icon-192x192.png' });
+// 次の通知予定時刻を表示する関数 (新規)
+function updateNextNotificationTime(intervalMinutes) {
+    if (!settings.notificationsEnabled) {
+        notificationDebugStatus.textContent = '通知はOFFです。';
+        return;
     }
+    const nextTime = new Date(Date.now() + intervalMinutes * 60 * 1000);
+    const hours = nextTime.getHours().toString().padStart(2, '0');
+    const minutes = nextTime.getMinutes().toString().padStart(2, '0');
+    notificationDebugStatus.innerHTML = `次の通知予定: <span class="font-semibold text-indigo-500 dark:text-indigo-400">${hours}:${minutes}</span> ごろ`;
+}
+
+function showNotification() {
+    if (reminders.length === 0) {
+        notificationDebugStatus.textContent = '通知する項目がありません。';
+        return;
+    }
+    const randomReminder = reminders[Math.floor(Math.random() * reminders.length)];
+    const notificationTitle = 'メディカル・リマインダー';
+    const notificationOptions = {
+        body: randomReminder.text,
+        icon: 'icons/icon-192x192.png',
+        badge: 'icons/icon-72x72.png'
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => reg.showNotification(notificationTitle, notificationOptions));
+    } else {
+        new Notification(notificationTitle, notificationOptions);
+    }
+    
+    // ステータスを更新 (修正)
+    const shortText = randomReminder.text.length > 20 ? randomReminder.text.substring(0, 20) + '…' : randomReminder.text;
+    notificationDebugStatus.textContent = `「${shortText}」を通知しました。`;
+    setTimeout(() => updateNextNotificationTime(settings.interval), 3000);
 }
 
 function startNotifications() {
@@ -306,6 +301,7 @@ function stopNotifications() {
     settings.notificationsEnabled = false;
     saveData();
     updateNotificationStatusUI();
+    notificationDebugStatus.textContent = '通知は停止しました。'; // (修正)
 }
 
 function updateNotificationStatusUI() {
@@ -325,7 +321,11 @@ document.addEventListener('DOMContentLoaded', () => {
             notificationToggle.checked = false;
             stopNotifications();
         });
+        updateNextNotificationTime(settings.interval); // (修正)
+    } else {
+        notificationDebugStatus.textContent = '通知はOFFです。'; // (修正)
     }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed:', err));
@@ -338,7 +338,9 @@ intervalInput.addEventListener('change', () => {
     if (!isNaN(newInterval) && newInterval >= 1) {
         settings.interval = newInterval;
         saveData();
-        if (settings.notificationsEnabled) startNotifications();
+        if (settings.notificationsEnabled) {
+            startNotifications();
+        }
     } else {
         intervalInput.value = settings.interval;
     }
@@ -390,12 +392,9 @@ modalForm.addEventListener('submit', (e) => {
     }
 });
 
-// 確認モーダルのイベントリスナー
 infoModalCancel.addEventListener('click', hideInfoModal);
 infoModalOk.addEventListener('click', () => {
-    if (typeof infoModalCallback === 'function') {
-        infoModalCallback();
-    }
+    if (typeof infoModalCallback === 'function') infoModalCallback();
     hideInfoModal();
 });
 infoModal.addEventListener('click', (e) => { if (e.target === infoModal) hideInfoModal(); });
