@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メディカル・リマインダー</title>
+    
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google FontsからInterフォントを読み込みます -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- PWAのための設定 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <style>
+        /* フォント設定 */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* カスタムのトグルスイッチのスタイル (修正版) */
+        .toggle-checkbox {
+            transition: transform 0.2s ease-in-out;
+        }
+        .toggle-checkbox:checked {
+            transform: translateX(1.75rem); /* 28px動かす */
+            border-color: #4f46e5;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4f46e5;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+
+    <div class="container mx-auto max-w-2xl p-4 pb-24">
+        <!-- ヘッダー -->
+        <header class="text-center my-6">
+            <h1 class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">メディカル・リマインダー</h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">記憶の定着をサポートします</p>
+        </header>
+
+        <!-- 設定エリア -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">設定</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                <!-- 通知間隔設定 -->
+                <div class="flex items-center gap-3">
+                    <label for="interval" class="font-medium">通知間隔:</label>
+                    <input type="number" id="interval" min="1" value="30" class="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <span>分ごと</span>
+                </div>
+                <!-- 通知ON/OFFスイッチ -->
+                <div class="flex items-center gap-3">
+                    <label for="toggle" class="font-medium">通知:</label>
+                    <div class="relative inline-block w-14 align-middle select-none">
+                        <input type="checkbox" name="toggle" id="toggle" class="toggle-checkbox absolute block w-7 h-7 rounded-full bg-white dark:bg-gray-400 border-2 appearance-none cursor-pointer"/>
+                        <label for="toggle" class="toggle-label block overflow-hidden h-7 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer"></label>
+                    </div>
+                    <span id="notification-status" class="font-semibold text-gray-500 dark:text-gray-400">OFF</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- リマインド項目リスト -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4">リマインド項目</h2>
+            <div id="reminder-list" class="grid grid-cols-1 gap-4">
+                <!-- ここにリマインド項目が動的に追加されます -->
+            </div>
+            <div id="empty-state" class="text-center py-10 px-6 bg-white dark:bg-gray-800 rounded-lg shadow-md mt-4">
+                <p class="text-gray-500 dark:text-gray-400">まだ項目がありません。<br>下の「+」ボタンから追加してください。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 追加ボタン -->
+    <button id="add-btn" class="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+    </button>
+
+    <!-- 追加/編集モーダル -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 id="modal-title" class="text-xl font-semibold mb-4">新しい項目を追加</h3>
+            <form id="modal-form">
+                <textarea id="modal-textarea" rows="5" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="覚えたい内容を入力..."></textarea>
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="modal-cancel" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">キャンセル</button>
+                    <button type="submit" id="modal-save" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 確認/情報モーダル (新規追加) -->
+    <div id="info-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="info-modal-title" class="text-lg font-semibold mb-4">確認</h3>
+            <p id="info-modal-body" class="mb-6 text-gray-600 dark:text-gray-300">この操作を続けてもよろしいですか？</p>
+            <div id="info-modal-buttons" class="flex justify-center gap-4">
+                <button type="button" id="info-modal-cancel" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">キャンセル</button>
+                <button type="button" id="info-modal-ok" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">OK</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- 要素の取得 ---
+const intervalInput = document.getElementById('interval');
+const notificationToggle = document.getElementById('toggle');
+const notificationStatus = document.getElementById('notification-status');
+const reminderList = document.getElementById('reminder-list');
+const emptyState = document.getElementById('empty-state');
+const addBtn = document.getElementById('add-btn');
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modal-title');
+const modalForm = document.getElementById('modal-form');
+const modalTextarea = document.getElementById('modal-textarea');
+const modalCancel = document.getElementById('modal-cancel');
+const modalSave = document.getElementById('modal-save');
+
+// --- 確認モーダルの要素取得 (新規) ---
+const infoModal = document.getElementById('info-modal');
+const infoModalTitle = document.getElementById('info-modal-title');
+const infoModalBody = document.getElementById('info-modal-body');
+const infoModalButtons = document.getElementById('info-modal-buttons');
+const infoModalCancel = document.getElementById('info-modal-cancel');
+const infoModalOk = document.getElementById('info-modal-ok');
+
+// --- アプリケーションの状態管理 ---
+let reminders = [];
+let settings = {
+    interval: 30,
+    notificationsEnabled: false
+};
+let notificationIntervalId = null;
+let editingReminderId = null;
+let infoModalCallback = null;
+
+// --- データ保存/読み込み (localStorage) ---
+function saveData() {
+    localStorage.setItem('medicalReminders', JSON.stringify(reminders));
+    localStorage.setItem('medicalReminderSettings', JSON.stringify(settings));
+}
+
+function loadData() {
+    const savedReminders = localStorage.getItem('medicalReminders');
+    if (savedReminders) {
+        reminders = JSON.parse(savedReminders);
+    }
+    const savedSettings = localStorage.getItem('medicalReminderSettings');
+    if (savedSettings) {
+        settings = JSON.parse(savedSettings);
+    }
+    intervalInput.value = settings.interval;
+    notificationToggle.checked = settings.notificationsEnabled;
+    updateNotificationStatusUI();
+}
+
+// --- UIの描画 ---
+function renderReminders() {
+    reminderList.innerHTML = '';
+    if (reminders.length === 0) {
+        emptyState.classList.remove('hidden');
+        reminderList.classList.add('hidden');
+    } else {
+        emptyState.classList.add('hidden');
+        reminderList.classList.remove('hidden');
+        reminders.forEach(reminder => {
+            const card = document.createElement('div');
+            card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex justify-between items-start gap-4';
+            card.innerHTML = `
+                <p class="flex-1 whitespace-pre-wrap break-words">${escapeHTML(reminder.text)}</p>
+                <div class="flex-shrink-0 flex gap-2">
+                    <button data-id="${reminder.id}" class="edit-btn p-2 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z"/></svg>
+                    </button>
+                    <button data-id="${reminder.id}" class="delete-btn p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            `;
+            reminderList.appendChild(card);
+        });
+    }
+}
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, match => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[match]);
+}
+
+// --- モーダル制御 ---
+function showModal(isEditing = false, reminderId = null) {
+    modal.classList.remove('hidden');
+    if (isEditing && reminderId) {
+        editingReminderId = reminderId;
+        const reminder = reminders.find(r => r.id === reminderId);
+        modalTitle.textContent = '項目を編集';
+        modalTextarea.value = reminder.text;
+    } else {
+        editingReminderId = null;
+        modalTitle.textContent = '新しい項目を追加';
+        modalTextarea.value = '';
+    }
+    modalTextarea.focus();
+}
+
+function hideModal() {
+    modal.classList.add('hidden');
+}
+
+// --- 確認/情報モーダル制御 (新規) ---
+function hideInfoModal() {
+    infoModal.classList.add('hidden');
+    infoModalCallback = null;
+}
+
+function showConfirmation(title, body, onOk) {
+    infoModalTitle.textContent = title;
+    infoModalBody.textContent = body;
+    infoModalOk.className = 'px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700';
+    infoModalCancel.classList.remove('hidden');
+    infoModalOk.classList.remove('hidden');
+    infoModalButtons.classList.remove('justify-center');
+    infoModalButtons.classList.add('justify-end');
+    infoModalCallback = onOk;
+    infoModal.classList.remove('hidden');
+}
+
+function showMessage(title, body) {
+    infoModalTitle.textContent = title;
+    infoModalBody.textContent = body;
+    infoModalOk.className = 'px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700';
+    infoModalCancel.classList.add('hidden');
+    infoModalOk.classList.remove('hidden');
+    infoModalButtons.classList.remove('justify-end');
+    infoModalButtons.classList.add('justify-center');
+    infoModalCallback = null;
+    infoModal.classList.remove('hidden');
+}
+
+// --- 通知機能 ---
+function requestNotificationPermission() {
+    return new Promise((resolve, reject) => {
+        if (!('Notification' in window)) {
+            showMessage('エラー', 'このブラウザはデスクトップ通知をサポートしていません。');
+            reject('Not supported');
+            return;
+        }
+        if (Notification.permission === 'granted') {
+            resolve('Granted');
+            return;
+        }
+        if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') resolve('Granted');
+                else reject('Denied');
+            });
+        } else {
+            reject('Denied');
+        }
+    });
+}
+
+function showNotification() {
+    if (reminders.length === 0) return;
+    const randomReminder = reminders[Math.floor(Math.random() * reminders.length)];
+    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => reg.showNotification('メディカル・リマインダー', {
+            body: randomReminder.text,
+            icon: 'icons/icon-192x192.png',
+            badge: 'icons/icon-72x72.png'
+        }));
+    } else {
+        new Notification('メディカル・リマインダー', { body: randomReminder.text, icon: 'icons/icon-192x192.png' });
+    }
+}
+
+function startNotifications() {
+    if (notificationIntervalId) clearInterval(notificationIntervalId);
+    const intervalMinutes = parseInt(intervalInput.value, 10);
+    if (isNaN(intervalMinutes) || intervalMinutes < 1) return;
+    
+    settings.interval = intervalMinutes;
+    settings.notificationsEnabled = true;
+    saveData();
+    
+    showNotification();
+    notificationIntervalId = setInterval(showNotification, intervalMinutes * 60 * 1000);
+    updateNotificationStatusUI();
+}
+
+function stopNotifications() {
+    if (notificationIntervalId) clearInterval(notificationIntervalId);
+    notificationIntervalId = null;
+    settings.notificationsEnabled = false;
+    saveData();
+    updateNotificationStatusUI();
+}
+
+function updateNotificationStatusUI() {
+    notificationStatus.textContent = settings.notificationsEnabled ? 'ON' : 'OFF';
+    notificationStatus.classList.toggle('text-indigo-600', settings.notificationsEnabled);
+    notificationStatus.classList.toggle('dark:text-indigo-400', settings.notificationsEnabled);
+    notificationStatus.classList.toggle('text-gray-500', !settings.notificationsEnabled);
+    notificationStatus.classList.toggle('dark:text-gray-400', !settings.notificationsEnabled);
+}
+
+// --- イベントリスナー ---
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    renderReminders();
+    if (settings.notificationsEnabled) {
+        requestNotificationPermission().then(startNotifications).catch(() => {
+            notificationToggle.checked = false;
+            stopNotifications();
+        });
+    }
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed:', err));
+        });
+    }
+});
+
+intervalInput.addEventListener('change', () => {
+    const newInterval = parseInt(intervalInput.value, 10);
+    if (!isNaN(newInterval) && newInterval >= 1) {
+        settings.interval = newInterval;
+        saveData();
+        if (settings.notificationsEnabled) startNotifications();
+    } else {
+        intervalInput.value = settings.interval;
+    }
+});
+
+notificationToggle.addEventListener('change', () => {
+    if (notificationToggle.checked) {
+        requestNotificationPermission().then(startNotifications).catch(() => {
+            notificationToggle.checked = false;
+            showMessage('通知エラー', '通知が許可されませんでした。ブラウザの設定を確認してください。');
+        });
+    } else {
+        stopNotifications();
+    }
+});
+
+reminderList.addEventListener('click', (e) => {
+    const target = e.target.closest('button');
+    if (!target) return;
+    const id = target.dataset.id;
+    if (target.classList.contains('edit-btn')) {
+        showModal(true, id);
+    } else if (target.classList.contains('delete-btn')) {
+        showConfirmation('削除の確認', 'この項目を本当に削除しますか？', () => {
+            reminders = reminders.filter(r => r.id !== id);
+            saveData();
+            renderReminders();
+        });
+    }
+});
+
+addBtn.addEventListener('click', () => showModal());
+modalCancel.addEventListener('click', hideModal);
+modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+
+modalForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = modalTextarea.value.trim();
+    if (text) {
+        if (editingReminderId) {
+            const reminder = reminders.find(r => r.id === editingReminderId);
+            if(reminder) reminder.text = text;
+        } else {
+            reminders.push({ id: Date.now().toString(), text: text });
+        }
+        saveData();
+        renderReminders();
+        hideModal();
+    }
+});
+
+// 確認モーダルのイベントリスナー
+infoModalCancel.addEventListener('click', hideInfoModal);
+infoModalOk.addEventListener('click', () => {
+    if (typeof infoModalCallback === 'function') {
+        infoModalCallback();
+    }
+    hideInfoModal();
+});
+infoModal.addEventListener('click', (e) => { if (e.target === infoModal) hideInfoModal(); });
+
+</script>
+</body>
+</html>
